@@ -1,0 +1,58 @@
+# Python
+# Virtual environment
+venv/
+env/
+.venv/
+
+# Byte-code and compiled files
+*.pyc
+__pycache__/
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+
+# Logs and databases
+*.log
+*.sqlite3
+db.sqlite3
+
+# Environment variables and sensitive files
+.env
+.flaskenv
+instance/
+.idea/  # Ignore specific IDE folders if necessary
+
+# React / Node.js
+# Dependency directory
+node_modules/
+
+# Build and output directories
+build/
+dist/
+out/
+esnext/
+target/
+.cabal-sandbox/
+.stack-work/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Optional caches
+.npm
+.eslintcache
+.stylelintcache
+.rpt2_cache/
+.chromatic/
+
+# Environment variables (commonly used in React projects)
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Editor-specific files (VS Code)
+.vscode/

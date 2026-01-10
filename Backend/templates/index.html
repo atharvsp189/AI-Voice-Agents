@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deepgram Voice Agent</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; background-color: #f4f4f9; }
+        h1 { color: #333; }
+        #controls { margin-bottom: 20px; display: flex; align-items: center; gap: 15px; }
+        button { 
+            padding: 12px 24px; font-size: 16px; cursor: pointer; 
+            background-color: #007bff; color: white; border: none; border-radius: 5px; 
+            transition: background 0.3s;
+        }
+        button:hover { background-color: #0056b3; }
+        button.recording { background-color: #dc3545; }
+        button.recording:hover { background-color: #a71d2a; }
+        
+        #transcript-box { 
+            border: 1px solid #ccc; padding: 20px; height: 400px; 
+            overflow-y: auto; background: #fff; border-radius: 8px; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            font-size: 1.1rem; line-height: 1.6;
+        }
+        .message { margin-bottom: 8px; }
+        .interim { color: #888; }
+        .final { color: #000; font-weight: 500; }
+        .status { font-weight: bold; color: #555; }
+    </style>
+</head>
+<body>
+
+    <h1>🎙️ Deepgram Live Transcription</h1>
+    
+    <div id="controls">
+        <button id="recordBtn" onclick="toggleRecording()">Start Recording</button>
+        <span id="status" class="status">Status: Ready</span>
+    </div>
+
+    <div id="transcript-box"></div>
+
+    <script>
+        let mediaRecorder;
+        let socket;
+        let isRecording = false;
+
+        const recordBtn = document.getElementById('recordBtn');
+        const statusSpan = document.getElementById('status');
+        const outputDiv = document.getElementById('transcript-box');
+
+        async function toggleRecording() {
+            if (isRecording) {
+                stopRecording();
+            } else {
+                await startRecording();
+            }
+        }
+
+        async function startRecording() {
+            try {
+                // Get microphone stream
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+                // Connect to Backend WebSocket
+                const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+                socket = new WebSocket(`${protocol}://${window.location.host}/listen`);
+
+                socket.onopen = () => {
+                    statusSpan.textContent = "Status: 🟢 Connected & Listening";
+                    recordBtn.textContent = "Stop Recording";
+                    recordBtn.classList.add("recording");
+                    isRecording = true;
+
+                    // Initialize MediaRecorder (Browser sends WebM/Opus by default)
+                    mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+
+                    mediaRecorder.addEventListener('dataavailable', async (event) => {
+                        if (event.data.size > 0 && socket.readyState === WebSocket.OPEN) {
+                            socket.send(event.data);
+                        }
+                    });
+
+                    // Send audio chunks every 250ms
+                    mediaRecorder.start(250);
+                };
+
+                socket.onmessage = (message) => {
+                    const data = JSON.parse(message.data);
+                    
+                    if (data.type === 'transcript') {
+                        // Create a new div for every message
+                        const newText = document.createElement('div');
+                        newText.textContent = (data.is_final ? "✅ " : "⏳ ") + data.text;
+                        newText.className = data.is_final ? 'message final' : 'message interim';
+                        
+                        outputDiv.appendChild(newText);
+                        
+                        // Auto-scroll to the bottom
+                        outputDiv.scrollTop = outputDiv.scrollHeight;
+                    }
+                };
+
+                socket.onclose = () => {
+                    console.log("WebSocket closed");
+                    stopRecording();
+                };
+
+                socket.onerror = (error) => {
+                    console.error("WebSocket error:", error);
+                    statusSpan.textContent = "Status: ❌ Connection Error";
+                };
+
+            } catch (err) {
+                console.error("Microphone Error:", err);
+                statusSpan.textContent = "Status: ❌ Microphone Permission Denied";
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+            }
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.close();
+            }
+
+            isRecording = false;
+            recordBtn.textContent = "Start Recording";
+            recordBtn.classList.remove("recording");
+            statusSpan.textContent = "Status: ⏹️ Stopped";
+        }
+    </script>
+</body>
+</html>
