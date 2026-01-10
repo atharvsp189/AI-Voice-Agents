@@ -1,38 +1,48 @@
 // src/App.jsx
 import { useState, useRef, useEffect } from 'react';
-import { Mic, Square, Plus, Globe, MoreHorizontal } from 'lucide-react';
+import { IoMic, IoSend, IoStop } from 'react-icons/io5'; 
 import './App.css';
 
 function App() {
   const [isRecording, setIsRecording] = useState(false);
-  const [transcripts, setTranscripts] = useState([]);
+  const [transcripts, setTranscripts] = useState([]); 
+  const [inputText, setInputText] = useState("");     
   const [connectionStatus, setConnectionStatus] = useState("Ready");
   
-  // Refs to keep track of socket and recorder without triggering re-renders
   const socketRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const chatContainerRef = useRef(null);
+  const textareaRef = useRef(null); // Ref for auto-resizing
+  const confirmedTextRef = useRef(""); 
 
-  // Auto-scroll to bottom when new transcripts arrive
+  // Auto-scroll chat to bottom
   useEffect(() => {
     if (chatContainerRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
   }, [transcripts]);
 
+  // Auto-resize Textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      // Reset height to auto to correctly calculate new scrollHeight (allows shrinking)
+      textareaRef.current.style.height = "auto";
+      // Set height to scrollHeight to fit content
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+    }
+  }, [inputText]);
+
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      
-      // 1. Connect to Backend
       setConnectionStatus("Connecting...");
       socketRef.current = new WebSocket("ws://localhost:8000/listen");
 
       socketRef.current.onopen = () => {
-        setConnectionStatus("Connected");
+        setConnectionStatus("Listening...");
         setIsRecording(true);
-        
-        // 2. Start MediaRecorder
+        confirmedTextRef.current = inputText; 
+
         const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
         mediaRecorderRef.current = mediaRecorder;
 
@@ -42,33 +52,30 @@ function App() {
           }
         });
 
-        mediaRecorder.start(250); // Send chunk every 250ms
+        mediaRecorder.start(250);
       };
 
       socketRef.current.onmessage = (message) => {
         const data = JSON.parse(message.data);
         if (data.type === 'transcript') {
-          setTranscripts(prev => {
-            // Logic to update the last message if it's interim, or add new if final
-            const lastMsg = prev[prev.length - 1];
-            if (lastMsg && !lastMsg.isFinal) {
-              // Replace interim message
-              return [...prev.slice(0, -1), { text: data.text, isFinal: data.is_final }];
-            } else {
-              // Add new message
-              return [...prev, { text: data.text, isFinal: data.is_final }];
-            }
-          });
+          const transcript = data.text;
+          const isFinal = data.is_final;
+          if (isFinal) {
+            confirmedTextRef.current += (confirmedTextRef.current ? " " : "") + transcript;
+            setInputText(confirmedTextRef.current);
+          } else {
+            setInputText((confirmedTextRef.current ? confirmedTextRef.current + " " : "") + transcript);
+          }
         }
-      };
-
-      socketRef.current.onclose = () => {
-        stopCleanup();
       };
 
       socketRef.current.onerror = () => {
         setConnectionStatus("Error");
         stopCleanup();
+      };
+
+      socketRef.current.onclose = () => {
+        if (isRecording) stopCleanup();
       };
 
     } catch (err) {
@@ -93,24 +100,50 @@ function App() {
     setConnectionStatus("Ready");
     socketRef.current = null;
     mediaRecorderRef.current = null;
+    confirmedTextRef.current = inputText; 
   };
 
-  const handleToggle = () => {
+  const handleToggleRecord = () => {
     if (isRecording) stopRecording();
     else startRecording();
+  };
+
+  const handleSend = () => {
+    if (!inputText.trim()) return;
+
+    setTranscripts(prev => [
+      ...prev, 
+      { text: inputText, sender: 'user', isFinal: true }
+    ]);
+
+    setInputText("");
+    confirmedTextRef.current = "";
+
+    setTimeout(() => {
+      setTranscripts(prev => [
+        ...prev,
+        { text: "Transcription done", sender: 'agent', isFinal: true }
+      ]);
+    }, 600);
+  };
+
+  // Handle Enter Key
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault(); // Prevent new line
+      handleSend();
+    }
   };
 
   return (
     <div className="app-container">
       {/* HEADER */}
       <header className="top-bar">
-        <div className="menu-icon">
-           <span className="brand">VoiceAI</span>
-        </div>
-        <div className="user-icon">AD</div>
+        <div className="brand">VoiceAI</div>
+        <div className="user-icon">AP</div>
       </header>
 
-      {/* MAIN CONTENT AREA */}
+      {/* CHAT AREA */}
       <main className="main-content" ref={chatContainerRef}>
         {transcripts.length === 0 ? (
           <div className="empty-state">
@@ -120,7 +153,7 @@ function App() {
         ) : (
           <div className="transcript-list">
             {transcripts.map((t, i) => (
-              <div key={i} className={`message ${t.isFinal ? 'final' : 'interim'}`}>
+              <div key={i} className={`message ${t.sender}`}>
                 {t.text}
               </div>
             ))}
@@ -128,26 +161,47 @@ function App() {
         )}
       </main>
 
-      {/* FLOATING INPUT BAR */}
+      {/* INPUT BAR */}
       <div className="input-area-wrapper">
         <div className="input-bar">
-          <button className="icon-btn secondary">
-            <Plus size={24} />
-          </button>
-
-          <div className="text-input-placeholder">
-            {connectionStatus === "Ready" ? "Start speaking..." : connectionStatus}
-          </div>
+          
+          <textarea 
+            ref={textareaRef}
+            className="text-input"
+            placeholder={isRecording ? "Listening..." : "Start speaking or type..."}
+            value={inputText}
+            onChange={(e) => {
+              setInputText(e.target.value);
+              confirmedTextRef.current = e.target.value; 
+            }}
+            onKeyDown={handleKeyDown}
+            rows={1}
+          />
 
           <div className="right-actions">
-            <button className={`icon-btn main-action ${isRecording ? 'active' : ''}`} onClick={handleToggle}>
-              {isRecording ? <Square size={20} fill="currentColor" /> : <Mic size={24} />}
+            
+            {/* Mic / Stop Button */}
+            <button 
+              className={`icon-btn mic-action ${isRecording ? 'recording' : ''}`} 
+              onClick={handleToggleRecord}
+            >
+              {isRecording ? <IoStop size={24} /> : <IoMic size={24} />}
             </button>
+
+            {/* Send Button */}
+            <button 
+              className={`icon-btn send-action ${!inputText.trim() ? 'disabled' : ''}`}
+              onClick={handleSend}
+              disabled={!inputText.trim()} 
+            >
+              <IoSend size={24} />
+            </button>
+
           </div>
         </div>
         
         <div className="footer-text">
-          AI Voice Assistant • Powered by Deepgram & FastAPI
+          {connectionStatus === "Listening..." ? "🔴 Listening..." : "AI Voice Assistant"}
         </div>
       </div>
     </div>

@@ -53,7 +53,7 @@ async def websocket_endpoint(websocket: WebSocket):
         try:
             logger.info("Waiting for audio from browser...")
             try:
-                first_chunk = audio_queue.get(timeout=30)
+                first_chunk = audio_queue.get(timeout=60)
             except queue.Empty:
                 logger.info("No audio received. Stopping.")
                 return
