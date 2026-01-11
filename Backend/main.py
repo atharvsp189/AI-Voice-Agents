@@ -6,15 +6,21 @@ import threading
 import queue
 from dotenv import load_dotenv
 
+# FastAPI Imports
 from fastapi import FastAPI, WebSocket, Request, WebSocketDisconnect
-from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
+from fastapi.responses import StreamingResponse
 
+# Deepgram Imports
 from deepgram import DeepgramClient
 from deepgram.core.events import EventType
 from deepgram.extensions.types.sockets import ListenV1SocketClientResponse
 from deepgram.extensions.types.sockets import ListenV1MediaMessage
 from deepgram.extensions.types.sockets import ListenV1ControlMessage
+
+# LLM Logic
+from llm_logic import stream_chat_response
 
 # Setup Logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -132,3 +138,10 @@ async def websocket_endpoint(websocket: WebSocket):
         stop_event.set()
         dg_thread.join(timeout=2)
         logger.info("Session ended")
+
+@app.get("/chat/stream")
+def chat_stream(session_id: str, message: str):
+    return StreamingResponse(
+        stream_chat_response(session_id, message),
+        media_type="text/plain"
+    )
