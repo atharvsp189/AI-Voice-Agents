@@ -1,19 +1,20 @@
 // src/App.jsx
 import { useState, useRef, useEffect } from 'react';
-import { IoMic, IoSend, IoStop } from 'react-icons/io5'; 
+import { IoMic, IoSend, IoStop } from 'react-icons/io5';
 import './App.css';
 
 function App() {
   const [isRecording, setIsRecording] = useState(false);
-  const [transcripts, setTranscripts] = useState([]); 
-  const [inputText, setInputText] = useState("");     
+  const [transcripts, setTranscripts] = useState([]);
+  const [inputText, setInputText] = useState("");
   const [connectionStatus, setConnectionStatus] = useState("Ready");
-  
+
   const socketRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const chatContainerRef = useRef(null);
   const textareaRef = useRef(null); // Ref for auto-resizing
-  const confirmedTextRef = useRef(""); 
+  const confirmedTextRef = useRef("");
+  const sessionIdRef = useRef(`session_${Date.now()}`);
 
   // Auto-scroll chat to bottom
   useEffect(() => {
@@ -36,12 +37,12 @@ function App() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       setConnectionStatus("Connecting...");
-      socketRef.current = new WebSocket("ws://localhost:8000/listen");
+      socketRef.current = new WebSocket("ws://localhost:8000/api/listen");
 
       socketRef.current.onopen = () => {
         setConnectionStatus("Listening...");
         setIsRecording(true);
-        confirmedTextRef.current = inputText; 
+        confirmedTextRef.current = inputText;
 
         const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
         mediaRecorderRef.current = mediaRecorder;
@@ -100,7 +101,7 @@ function App() {
     setConnectionStatus("Ready");
     socketRef.current = null;
     mediaRecorderRef.current = null;
-    confirmedTextRef.current = inputText; 
+    confirmedTextRef.current = inputText;
   };
 
   const handleToggleRecord = () => {
@@ -108,23 +109,78 @@ function App() {
     else startRecording();
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!inputText.trim()) return;
 
+    const userMessage = inputText;
+
+    // 1. Add User Message
     setTranscripts(prev => [
-      ...prev, 
-      { text: inputText, sender: 'user', isFinal: true }
+      ...prev,
+      { text: userMessage, sender: 'user', isFinal: true }
     ]);
 
     setInputText("");
     confirmedTextRef.current = "";
 
-    setTimeout(() => {
-      setTranscripts(prev => [
-        ...prev,
-        { text: "Transcription done", sender: 'agent', isFinal: true }
-      ]);
-    }, 600);
+    // 2. Add Placeholder Agent Message
+    setTranscripts(prev => [
+      ...prev,
+      { text: "", sender: 'agent', isFinal: false }
+    ]);
+
+    try {
+      // 3. Fetch from Streaming Endpoint
+      const response = await fetch(`http://localhost:8000/chat/stream?session_id=${sessionIdRef.current}&message=${encodeURIComponent(userMessage)}`);
+
+      if (!response.ok) throw new Error("Network response was not ok");
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+
+        setTranscripts(prev => {
+          const newArr = [...prev];
+          const lastIndex = newArr.length - 1;
+          if (newArr[lastIndex].sender === 'agent') {
+            newArr[lastIndex] = {
+              ...newArr[lastIndex],
+              text: newArr[lastIndex].text + chunk
+            };
+          }
+          return newArr;
+        });
+      }
+
+      // 4. Mark as Final
+      setTranscripts(prev => {
+        const newArr = [...prev];
+        const lastIndex = newArr.length - 1;
+        if (newArr[lastIndex].sender === 'agent') {
+          newArr[lastIndex] = { ...newArr[lastIndex], isFinal: true };
+        }
+        return newArr;
+      });
+
+    } catch (error) {
+      console.error("Streaming Error:", error);
+      setTranscripts(prev => {
+        const newArr = [...prev];
+        const lastIndex = newArr.length - 1;
+        if (newArr[lastIndex].sender === 'agent') {
+          newArr[lastIndex] = {
+            ...newArr[lastIndex],
+            text: newArr[lastIndex].text + " (Error: Failed to get response)",
+            isFinal: true
+          };
+        }
+        return newArr;
+      });
+    }
   };
 
   // Handle Enter Key
@@ -153,7 +209,7 @@ function App() {
         ) : (
           <div className="transcript-list">
             {transcripts.map((t, i) => (
-              <div key={i} className={`message ${t.sender}`}>
+              <div key={i} className={`message ${t.sender} ${!t.isFinal ? 'streaming' : ''}`}>
                 {t.text}
               </div>
             ))}
@@ -164,42 +220,42 @@ function App() {
       {/* INPUT BAR */}
       <div className="input-area-wrapper">
         <div className="input-bar">
-          
-          <textarea 
+
+          <textarea
             ref={textareaRef}
             className="text-input"
             placeholder={isRecording ? "Listening..." : "Start speaking or type..."}
             value={inputText}
             onChange={(e) => {
               setInputText(e.target.value);
-              confirmedTextRef.current = e.target.value; 
+              confirmedTextRef.current = e.target.value;
             }}
             onKeyDown={handleKeyDown}
             rows={1}
           />
 
           <div className="right-actions">
-            
+
             {/* Mic / Stop Button */}
-            <button 
-              className={`icon-btn mic-action ${isRecording ? 'recording' : ''}`} 
+            <button
+              className={`icon-btn mic-action ${isRecording ? 'recording' : ''}`}
               onClick={handleToggleRecord}
             >
               {isRecording ? <IoStop size={24} /> : <IoMic size={24} />}
             </button>
 
             {/* Send Button */}
-            <button 
+            <button
               className={`icon-btn send-action ${!inputText.trim() ? 'disabled' : ''}`}
               onClick={handleSend}
-              disabled={!inputText.trim()} 
+              disabled={!inputText.trim()}
             >
               <IoSend size={24} />
             </button>
 
           </div>
         </div>
-        
+
         <div className="footer-text">
           {connectionStatus === "Listening..." ? "🔴 Listening..." : "AI Voice Assistant"}
         </div>

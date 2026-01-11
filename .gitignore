@@ -56,3 +56,6 @@ yarn-error.log*
 
 # Editor-specific files (VS Code)
 .vscode/
+
+# chat store
+Backend/chat_store/

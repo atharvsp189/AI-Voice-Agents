@@ -46,7 +46,7 @@ def get(request: Request):
         return HTMLResponse(content=f.read())
 
 # speech to text
-@app.websocket("/listen")
+@app.websocket("/api/listen")
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
     logger.info("Client connected to WebSocket")

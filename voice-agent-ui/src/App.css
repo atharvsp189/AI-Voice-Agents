@@ -205,3 +205,18 @@ body, html {
 }
 
 .footer-text { margin-top: 1rem; font-size: 0.75rem; color: #9ca3af; }
+
+/* Streaming Cursor Effect */
+.message.agent.streaming::after {
+  content: "▋";
+  display: inline-block;
+  vertical-align: middle;
+  margin-left: 4px;
+  color: var(--accent-orange);
+  animation: blink 1s step-end infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
