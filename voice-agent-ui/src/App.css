@@ -96,7 +96,6 @@ body, html {
 
 .input-bar {
   display: flex; 
-  /* UPDATED: Align to flex-end so buttons stay at bottom when text grows */
   align-items: flex-end; 
   width: 100%; max-width: 768px;
   background-color: var(--input-bg);
@@ -116,21 +115,16 @@ body, html {
   font-size: 1rem;
   color: var(--text-primary);
   resize: none;
-  
-  /* UPDATED: Height handling */
   min-height: 24px; 
   height: auto;
-  max-height: 150px; /* Optional cap if user types an essay */
-  overflow-y: hidden; /* Hide scrollbar */
-  
+  max-height: 150px; 
+  overflow-y: hidden; 
   padding: 0;
   margin: 0;
   min-width: 50px; 
-  
-  /* Center text vertically if single line */
   line-height: 1.5;
-  padding-bottom: 2px; /* Slight tweak for alignment with buttons */
-  margin-bottom: 10px; /* Align with the buttons which are 48px height */
+  padding-bottom: 2px; 
+  margin-bottom: 10px; 
 }
 .text-input::placeholder { color: var(--text-secondary); }
 
@@ -170,6 +164,15 @@ body, html {
   color: #1a1a1a; 
 }
 .mic-action:hover {
+  background-color: #e5e7eb;
+}
+
+/* 1.5. VOICE AGENT BUTTON (New) */
+.agent-action {
+  background-color: #f3f4f6;
+  color: #1a1a1a;
+}
+.agent-action:hover {
   background-color: #e5e7eb;
 }
 

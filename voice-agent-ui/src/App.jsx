@@ -1,6 +1,7 @@
 // src/App.jsx
 import { useState, useRef, useEffect } from 'react';
-import { IoMic, IoSend, IoStop } from 'react-icons/io5';
+// Added IoHeadset to the import list
+import { IoMic, IoSend, IoStop, IoHeadset } from 'react-icons/io5';
 import './App.css';
 
 function App() {
@@ -12,7 +13,7 @@ function App() {
   const socketRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const chatContainerRef = useRef(null);
-  const textareaRef = useRef(null); // Ref for auto-resizing
+  const textareaRef = useRef(null); 
   const confirmedTextRef = useRef("");
   const sessionIdRef = useRef(`session_${Date.now()}`);
 
@@ -26,9 +27,7 @@ function App() {
   // Auto-resize Textarea
   useEffect(() => {
     if (textareaRef.current) {
-      // Reset height to auto to correctly calculate new scrollHeight (allows shrinking)
       textareaRef.current.style.height = "auto";
-      // Set height to scrollHeight to fit content
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
     }
   }, [inputText]);
@@ -183,10 +182,9 @@ function App() {
     }
   };
 
-  // Handle Enter Key
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault(); // Prevent new line
+      e.preventDefault(); 
       handleSend();
     }
   };
@@ -242,6 +240,15 @@ function App() {
               onClick={handleToggleRecord}
             >
               {isRecording ? <IoStop size={24} /> : <IoMic size={24} />}
+            </button>
+
+            {/* NEW: Voice Agent Button */}
+            <button 
+              className="icon-btn agent-action"
+              onClick={() => console.log("Voice Agent toggled")}
+              title="Voice Agent"
+            >
+              <IoHeadset size={24} />
             </button>
 
             {/* Send Button */}

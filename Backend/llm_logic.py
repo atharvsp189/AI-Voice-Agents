@@ -55,10 +55,10 @@ def stream_chat_response(session_id: str, user_message: str):
     response = chat_engine.stream_chat(user_message)
     assistant_reply = []
 
-    print("DEBUG: response object =", response)
+    # print("DEBUG: response object =", response)
 
     for token in response.response_gen:
-        print("TOKEN:", repr(token))
+        # print("TOKEN:", repr(token))
         assistant_reply.append(token)
         yield token
     

@@ -11,6 +11,7 @@ from fastapi import FastAPI, WebSocket, Request, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.responses import StreamingResponse
+from fastapi import HTTPException
 
 # Deepgram Imports
 from deepgram import DeepgramClient
@@ -143,5 +144,19 @@ async def websocket_endpoint(websocket: WebSocket):
 def chat_stream(session_id: str, message: str):
     return StreamingResponse(
         stream_chat_response(session_id, message),
+        media_type="text/plain"
+    )
+
+@app.post("/chat/stream/text")
+def chat_stream(session_id: str, user_input: str):
+    return StreamingResponse(
+        stream_chat_response(session_id, user_input),
+        media_type="text/plain"
+    )
+
+@app.post("/chat/stream/voice")
+def chat_stream(session_id: str, user_input: str):
+    return StreamingResponse(
+        stream_chat_response(session_id, user_input),
         media_type="text/plain"
     )
